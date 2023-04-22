@@ -8,17 +8,37 @@ dayjs.extend(relativeTime);
 
 import { RouterOutputs, api } from "~/utils/api";
 import Image from "next/image";
+import { LoadingPage, LoadingSpinner } from "~/components/loading";
+import { useState } from "react";
 
 
 const CreatePostWizard = () => {
   const {user} = useUser();
+  const [content, setContent] = useState("");
+  const ctx =  api.useContext();
+  
+  const {mutate, isLoading: isPosting} = api.post.create.useMutation({
+    onSuccess:() => {
+      setContent("");
+      void ctx.post.getAll.invalidate();
+    }
+  });
+
 
   if(!user) return null;
 
   return (
     <div className="flex gap-3 w-full">
       <Image src={user.profileImageUrl} width={56} height={56} alt="Profile Image" className="w-14 h-14 rounded-full" />
-      <input placeholder="Type something to post" className="grow bg-transparent outline-none" />
+      <input 
+        type="text" 
+        value={content} 
+        onChange={(e) => setContent(e.target.value)} 
+        placeholder="Type something to post" 
+        className="grow bg-transparent outline-none" 
+        disabled={isPosting}
+      />
+      <button disabled={isPosting} onClick={() => mutate({content})}>Post</button>
     </div>
   )
 
@@ -35,7 +55,7 @@ const PostView = (props:PostWithUser) => {
         <div className="flex text-slate-300 gap-1">
           <span>{`@${author.username}`}</span><span>·</span><span>{dayjs(post.createdAt).fromNow()}</span>
         </div>
-        <span>
+        <span className="text-lg">
           {post.content}
         </span>
       </div>
@@ -47,7 +67,11 @@ const Home: NextPage = () => {
 
   const user = useUser();
 
-  const {data} = api.post.getAll.useQuery();
+  const {data, isLoading} = api.post.getAll.useQuery();
+
+  if(isLoading) return <LoadingPage />
+
+  if(!data) return <div>Something went wrong</div>
 
   return (
     <>
@@ -62,7 +86,7 @@ const Home: NextPage = () => {
             {user.isSignedIn && <CreatePostWizard />}
           </div>
           <div className="flex flex-col">
-            {data?.map((fullPost, index) => (
+            {data.map((fullPost, index) => (
               <PostView key={index} {...fullPost} />
             ))}
           </div>
